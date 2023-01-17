@@ -1,0 +1,48 @@
+<!DOCTYPE html><html><head>
+	<meta charset="utf-8" />
+</head><body>
+
+<script src="lib/bqn.js"></script>
+<script src="./helpers.js"></script>
+<script>
+_js_obj_reg = new Map();
+</script>
+<script> (async () => {
+	// ok, this works..
+   await Promise.all([
+		['rx.bqn', './rx.bqn'],
+		['dom.bqnx', './dom.bqnx'],
+	].map(args => preloadBqnModule(...args)))
+   console.log('...preload done...');
+
+	const callBqn = (fn) => {
+		//return fn();
+		try {
+			return fn();
+		} catch (e) {
+			// debugger;
+			throw (fmtErr(e)); // defined in bqn.js
+		}
+	}
+
+	const rxbqn = sysvals.import('rx.bqn');
+   const interpreter = nsget(rxbqn)('rxbqn');
+   console.log('...rx eval done...');
+	const main = await fetch('./dom.bqnx').then(rsp => rsp.text());
+	let result;
+	callBqn(() => {
+		result = interpreter(Object.assign(Array.from(main), {sh: [main.length]}));
+	});
+   console.log('...dom.bqnx eval done...');
+	let root;
+	callBqn(() => {
+		root = nsget(result)('main')();
+	})
+	const node = _js_obj_reg.get(root);
+	document.body.appendChild(node);
+   console.log('...All done!');
+})()</script>
+
+
+
+</body></html>

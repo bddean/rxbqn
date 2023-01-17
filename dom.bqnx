@@ -1,0 +1,139 @@
+rx←•Import "rx.bqn"
+⟨_ForEach⟩←rx
+
+# Maybe define a narrower api as a system function that could be cross-platform...
+# - createNode
+# - setNodeAttribute
+# - setNodeData
+# - isNode
+# - event target (node)
+# 	- different from normal node interface maybe???
+# - event value (something reasonable for each event kind)
+# 	-there are only 45 different event kinds...
+# 
+
+# TODO: GC???
+parseFloat     ← •JS "s => (s.join?parseFloat(s.join('')):Number(s))"
+createElement‿setAttribute‿appendChild‿createTextNode‿setText‿isDomNode←•JS ∾⟨"(() => {const m=_js_obj_reg;let i = 0; const p = x => (m.set(++i,x),i); const g = i => m.get(i); const j=s=>s.join?s.join(''):(s+''); return["
+	"tag => p(document.createElement(tag.join(''))),"
+	"([k,v], n) => {"
+	# Special case: $ prefix for JS properties
+	"	if(k[0] == '$') g(n)[j(k).substring(1)]=j(v);"
+	"	else g(n).setAttribute(j(k), j(v));"
+	"	return n;"
+	"},"
+	"(nc, np) => (g(np).appendChild(g(nc)),nc),"
+	"txt => p(document.createTextNode(j(txt))),"
+	"(n, txt) => ((g(n).data=j(txt)), n),"
+	"n => g(n) instanceof Node ? 1 : 0,"
+"]})()"⟩
+
+# TODO next -- make text work correctly...
+# TODO fix events too
+callbackCounter←0
+SetAttributeOrListener ← {n 𝕊 k‿v : {
+	"on"≡2↑k ?
+		name←"window._cb_" ∾ •Repr (callbackCounter+↩1)
+		setCb←•JS "v => "∾name∾"=v"
+		SetCb v
+		n SetAttribute ⟨k, name∾"(event.target.value)"⟩ # TODO: Support more events!
+	; n SetAttribute k‿v
+}}
+
+RenderTextNode←{
+	n←CreateTextNode ""
+	SetText⟜n _ForEach 𝕩
+	n
+}
+
+# TODO
+# - move to js
+# - attr functoins
+# - @ means omit attr
+
+Render⇐{𝕊 it: {
+ 		IsDomNode    it ? it ;
+		# TODO: Promise support obvi needs to be more general!
+		{𝕩.then⋄1}⎊{∧´𝕩>@}⎊(0˙) it ? RenderTextNode it ;
+
+	attrs‿tag‿children←it
+	n←CreateElement tag
+	{𝕊 name‿v :
+		n⊸SetAttributeOrListener _ForEach name⊸⋈ᴗ v # TODO or listener
+	}¨attrs
+	rendered←Render¨children
+	n⊸AppendChild¨rendered # TODO streams, flatten
+	n
+}}
+Listener←{𝕊 evt:
+	listen ← @
+	stream ← rx.Signal {{ 𝕊 push‿close :
+		Listen↩{ 𝕊 attrs‿tag‿children :
+			attrs∾↩⟨("on"∾evt)‿push⟩ # Renderer responsible for interpreting 
+			# TODO: When node is deleted, unlisten and close
+			attrs‿tag‿children
+		}
+	}}
+	stream‿listen
+}⚇1
+ChangeListener←{𝕊 e‿L: 
+	# TODO gode golf with "under first" or whatever
+	# TODO needs to prepend "value" attribute first..?
+	e‿L
+}∘(Listener⟜"change")
+ChangeListener↩{𝕤⋄Listener "change"}
+
+
+Div   ←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"div"‿𝕩   } # TODO simplify...
+T     ←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"#text"‿𝕩 } # TODO:?
+Button←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"button"‿𝕩}
+Form  ←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"form"‿𝕩  }
+Label ←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"label"‿𝕩 }
+Select←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"select"‿𝕩}
+Option←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"option"‿𝕩}
+Input ←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"input"‿𝕩 }
+
+
+# TODO event listeners
+
+# TODO other files...
+Counter←{𝕤⋄
+	# Listener returns a stream of values and a event listen function to attach
+	# to a node.
+	e‿L←Listener "click"
+	bump←L Button ⟨"Click me!"⟩
+	# 𝔽₍ is async scan
+	# 𝔽ᴗ is async each
+	# So 0 +₍ 1ᴗe is the count of click events.
+	Div ⟨ Div ⟨ 0+₍1ᴗe, " total clicks"⟩⟩∾bump¨↕3
+}
+
+Temperature←{𝕤⋄
+	⟨fIn‿LF, cIn‿LC⟩←ChangeListener¨↕2
+	# 𝔽₊, "_Bind" does two way data binding on its arguments.
+	# ⌹, "Cons", is used to add the initial value of 0°C
+	# Prepending $ to an attribute means a JS property.
+	Temp←{⟨"type"‿"number", "$value"‿𝕩⟩ Input ⟨⟩}
+	f‿c←Temp¨ ×⟜(5÷9)∘(-⟜32)₊´ ParseFloatᴗ¨⟨fIn, "0" ⌹ cIn⟩
+	Div ⟨LF f, "°F = ", LC c, "°C"⟩
+}
+
+# Incomplete...
+Booker←{𝕤⋄
+	⟨opt‿LOpt, start‿LStart, return‿LReturn⟩←ChangeListener¨↕3
+	noReturn←"true"⌹{⊑⟜⟨@‿"true"⟩ "1"≡𝕩.target.value}ᴗopt
+	Form Div˘⟨
+		LOpt ⟨⟩ Select ⟨
+			⟨"value"‿"0", "selected"‿"true"⟩ Option "one-way flight"
+			⟨"value"‿"1"                   ⟩ Option "return flight"
+		⟩
+		LStart  ⟨"type"‿"date"                     ⟩ Input ⟨⟩
+		LReturn ⟨"type"‿"date", "disabled"‿noReturn⟩ Input ⟨⟩
+	⟩
+}
+
+Main⇐{𝕤⋄
+	#Render ⟨⟨"style"‿"width:200px;height:200px;border:1px solid black;"⟩, "div", ⟨⟩⟩Render ⟨⟨"style"‿"width:200px;height:200px;border:1px solid black;"⟩, "div", ⟨⟩⟩
+	Render Temperature @
+	#CreateElement "div"
+}
