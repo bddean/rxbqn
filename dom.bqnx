@@ -93,32 +93,25 @@ Select←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"select"‿𝕩}
 Option←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"option"‿𝕩}
 Input ←{𝕊𝕩: ⟨⟩𝕊𝕩 ; 𝕨𝕊𝕩: 𝕨‿"input"‿𝕩 }
 
-
-# TODO event listeners
-
-# TODO other files...
-Counter←{𝕤⋄
-	# Listener returns a stream of values and a event listen function to attach
-	# to a node.
-	e‿L←Listener "click"
+### Examples ###
+# TODO move these to other files...
+Counter⇐{𝕤⋄
+	e‿L←Listener "click" # e is an event stream and L attaches it to an element
 	bump←L Button ⟨"Click me!"⟩
-	# 𝔽₍ is async scan
-	# 𝔽ᴗ is async each
-	# So 0 +₍ 1ᴗe is the count of click events.
+	# 𝔽₍ is async scan, 𝔽ᴗ is async each. Here the same button is shown 3 times.
 	Div ⟨ Div ⟨ 0+₍1ᴗe, " total clicks"⟩⟩∾bump¨↕3
 }
 
-Temperature←{𝕤⋄
+Temperature⇐{𝕤⋄
 	⟨fIn‿LF, cIn‿LC⟩←ChangeListener¨↕2
-	# 𝔽₊, "_Bind" does two way data binding on its arguments.
+	Temp←{⟨"type"‿"number", "$value"‿𝕩⟩ Input ⟨⟩} # '$' indicates JS prop
+	# 𝔽₊, "_Bind" uses function inverses to do two-way data binding.
 	# ⌹, "Cons", is used to add the initial value of 0°C
-	# Prepending $ to an attribute means a JS property.
-	Temp←{⟨"type"‿"number", "$value"‿𝕩⟩ Input ⟨⟩}
 	f‿c←Temp¨ ×⟜(5÷9)∘(-⟜32)₊´ ParseFloatᴗ¨⟨fIn, "0" ⌹ cIn⟩
 	Div ⟨LF f, "°F = ", LC c, "°C"⟩
 }
 
-# Incomplete...
+# This does not work yet
 Booker←{𝕤⋄
 	⟨opt‿LOpt, start‿LStart, return‿LReturn⟩←ChangeListener¨↕3
 	noReturn←"true"⌹{⊑⟜⟨@‿"true"⟩ "1"≡𝕩.target.value}ᴗopt
@@ -133,7 +126,5 @@ Booker←{𝕤⋄
 }
 
 Main⇐{𝕤⋄
-	#Render ⟨⟨"style"‿"width:200px;height:200px;border:1px solid black;"⟩, "div", ⟨⟩⟩Render ⟨⟨"style"‿"width:200px;height:200px;border:1px solid black;"⟩, "div", ⟨⟩⟩
 	Render Temperature @
-	#CreateElement "div"
 }
